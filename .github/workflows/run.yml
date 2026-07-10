@@ -9,6 +9,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Jalankan Grafana k6 Secara Otomatis
-        uses: grafana/k6-action@v1
+        uses: grafana/k6-action@v0.3.1
         with:
           filename: skrip_ekstrim.js
