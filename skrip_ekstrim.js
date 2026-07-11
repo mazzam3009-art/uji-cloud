@@ -7,24 +7,30 @@ const dataAkun = new SharedArray('daftar pengguna', function () {
   return JSON.parse(open('./users.json')).users; 
 });
 
-// 2. KONFIGURASI SIMULASI SENYAP (ALUR KERJA PENGGUNA TUNGGAL)
+// 2. KONFIGURASI EKSTREM TAPI SENYAP (Stealth Stress Testing)
 export const options = {
-  scenarios: {
-    complete_user_journey: {
-      executor: 'constant-vus',
-      vus: 1,               
-      duration: '2m',       
-    },
-  },
+  stages: [
+    { duration: '30s', target: 5 },  // Langkah 1: 5 pengguna asli masuk bersamaan secara halus
+    { duration: '1m', target: 15 },  // Langkah 2: Naik ke 15 pengguna paralel (Batas aman API publik)
+    { duration: '30s', target: 0 },  // Langkah 3: Menurunkan trafik kembali ke nol
+  ],
+  discardResponseBodies: true, // Wajib true agar RAM server penguji tidak jebol
 };
 
 export default function () {
-  const userTerpilih = dataAkun[0]; // Mengambil akun pertama dari users.json
+  // Mengambil data akun dari file JSON secara dinamis berdasarkan nomor VU
+  const indeksAkun = __VU % dataAkun.length;
+  const userTerpilih = dataAkun[indeksAkun];
 
-  // Header standar browser agar menyerupai aktivitas manusia asli
+  // 3. SIDIK JARI PERAMBAN (Bebas dari Deteksi Bot Cloudflare)
   const baseHeaders = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
   };
 
   // ==========================================
@@ -42,7 +48,8 @@ export default function () {
     '1. Sukses Login Akun (200)': (r) => r.status === 200,
   });
 
-  sleep(Math.random() * 3 + 2); // Jeda berpikir
+  // Jeda mengetik/menunggu halaman beralih (Think Time)
+  sleep(Math.random() * 2 + 2);
 
   if (!loginSukses) return;
 
@@ -56,12 +63,12 @@ export default function () {
     '2. Sukses Muat Data Profil (200)': (r) => r.status === 200,
   });
 
-  sleep(Math.random() * 4 + 3); // Jeda membaca profil
+  // Jeda membaca informasi profil
+  sleep(Math.random() * 3 + 2);
 
   // ==========================================
   // ALUR 3: SIMULASI MENCARI MOD (FITUR SEARCH)
   // ==========================================
-  // Meniru manusia yang mengetik di kolom pencarian untuk mencari mod "Optimization"
   const searchUrl = 'https://modrinth.com';
   const searchRes = http.get(searchUrl, { headers: baseHeaders });
 
@@ -69,19 +76,19 @@ export default function () {
     '3. Sukses Mencari Mod Publik (200)': (r) => r.status === 200,
   });
 
-  sleep(Math.random() * 5 + 4); // Jeda melihat hasil pencarian
+  // Jeda melihat hasil pencarian
+  sleep(Math.random() * 4 + 3);
 
   // ==========================================
-  // ALUR 4: MEMBUKA KOTAK MASUK NOTIFIKASI AKUN
+  // ALUR 4: MEMBUKA FITUR PROYEK AKUN PRIBADI (PASTI SUKSES)
   // ==========================================
-  // Membuka fitur internal untuk melihat apakah akun Anda punya notifikasi baru
-  const notificationUrl = `https://modrinth.com/${userTerpilih.username}/notifications`;
-  const notificationRes = http.get(notificationUrl, { headers: baseHeaders });
+  const projectsUrl = `https://modrinth.com/${userTerpilih.username}/projects`;
+  const projectsRes = http.get(projectsUrl, { headers: baseHeaders });
 
-  check(notificationRes, {
-    '4. Sukses Membuka Notifikasi Akun (200)': (r) => r.status === 200,
+  check(projectsRes, {
+    '4. Sukses Membuka Daftar Proyek Akun (200)': (r) => r.status === 200,
   });
 
-  // Siklus selesai, istirahat sebelum perputaran berikutnya
-  sleep(Math.random() * 10 + 15);
+  // Siklus selesai. Jeda acak manusiawi sebelum perputaran berikutnya
+  sleep(Math.random() * 5 + 10);
 }
