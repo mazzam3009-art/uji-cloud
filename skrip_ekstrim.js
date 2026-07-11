@@ -7,28 +7,29 @@ const dataAkun = new SharedArray('daftar pengguna', function () {
   return JSON.parse(open('./users.json')).users; 
 });
 
-// 2. KONFIGURASI SIMULASI SILUMAN (1 USER)
+// 2. KONFIGURASI SIMULASI SENYAP (ALUR KERJA PENGGUNA TUNGGAL)
 export const options = {
   scenarios: {
-    cookie_auth_simulation: {
+    complete_user_journey: {
       executor: 'constant-vus',
       vus: 1,               
-      duration: '1m',       
+      duration: '2m',       
     },
   },
 };
 
 export default function () {
-  // Mengambil data akun dari file json
-  const userTerpilih = dataAkun[0]; 
+  const userTerpilih = dataAkun[0]; // Mengambil akun pertama dari users.json
 
-  // Header standar browser agar tidak dicurigai sebagai bot
+  // Header standar browser agar menyerupai aktivitas manusia asli
   const baseHeaders = {
     'Content-Type': 'application/json',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   };
 
-  // --- LANGKAH 1: PROSES LOGIN ---
+  // ==========================================
+  // ALUR 1: PROSES LOGIN (JABAT TANGAN UTAMA)
+  // ==========================================
   const loginUrl = 'https://modrinth.com'; 
   const loginPayload = JSON.stringify({
     username: userTerpilih.username,
@@ -37,25 +38,50 @@ export default function () {
 
   const loginRes = http.post(loginUrl, loginPayload, { headers: baseHeaders });
 
-  // Validasi apakah login awal berhasil
   const loginSukses = check(loginRes, {
-    '1. Berhasil Jabat Tangan Login (200)': (r) => r.status === 200,
+    '1. Sukses Login Akun (200)': (r) => r.status === 200,
   });
 
-  // --- LANGKAH 2: LANGSUNG TEMBAK FITUR DALAM (Cookie Otomatis Berjalan) ---
-  if (loginSukses) {
-    // Alamat API untuk melihat profil pengguna yang sedang login
-    const profileUrl = 'https://modrinth.com'; 
-    
-    // k6 otomatis mengirimkan Cookie Sesi di latar belakang, cukup gunakan baseHeaders
-    const profileRes = http.get(profileUrl, { headers: baseHeaders });
+  sleep(Math.random() * 3 + 2); // Jeda berpikir
 
-    // Validasi apakah data profil internal berhasil diakses
-    check(profileRes, {
-      '2. Sukses Masuk Fitur Internal Akun (200)': (r) => r.status === 200,
-    });
-  }
+  if (!loginSukses) return;
 
-  // Jeda waktu berpikir manusiawi (10 sampai 15 detik) agar tidak memicu alarm keamanan
-  sleep(Math.random() * 5 + 10);
+  // ==========================================
+  // ALUR 2: MELIHAT DATA PROFIL INTERNAL
+  // ==========================================
+  const profileUrl = 'https://modrinth.com'; 
+  const profileRes = http.get(profileUrl, { headers: baseHeaders });
+
+  check(profileRes, {
+    '2. Sukses Muat Data Profil (200)': (r) => r.status === 200,
+  });
+
+  sleep(Math.random() * 4 + 3); // Jeda membaca profil
+
+  // ==========================================
+  // ALUR 3: SIMULASI MENCARI MOD (FITUR SEARCH)
+  // ==========================================
+  // Meniru manusia yang mengetik di kolom pencarian untuk mencari mod "Optimization"
+  const searchUrl = 'https://modrinth.com';
+  const searchRes = http.get(searchUrl, { headers: baseHeaders });
+
+  check(searchRes, {
+    '3. Sukses Mencari Mod Publik (200)': (r) => r.status === 200,
+  });
+
+  sleep(Math.random() * 5 + 4); // Jeda melihat hasil pencarian
+
+  // ==========================================
+  // ALUR 4: MEMBUKA KOTAK MASUK NOTIFIKASI AKUN
+  // ==========================================
+  // Membuka fitur internal untuk melihat apakah akun Anda punya notifikasi baru
+  const notificationUrl = `https://modrinth.com/${userTerpilih.username}/notifications`;
+  const notificationRes = http.get(notificationUrl, { headers: baseHeaders });
+
+  check(notificationRes, {
+    '4. Sukses Membuka Notifikasi Akun (200)': (r) => r.status === 200,
+  });
+
+  // Siklus selesai, istirahat sebelum perputaran berikutnya
+  sleep(Math.random() * 10 + 15);
 }
