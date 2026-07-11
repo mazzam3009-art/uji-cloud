@@ -1,60 +1,61 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { SharedArray } from 'k6/data'; // 1. WAJIB IMPORT INI
+import { SharedArray } from 'k6/data';
 
-// 2. MEMUAT DATA JSON KE MEMORI SECARA EFISIEN
+// 1. MEMUAT DATA AKUN ASLI
 const dataAkun = new SharedArray('daftar pengguna', function () {
-  // Membaca file users.json dan mengambil properti array "users"
   return JSON.parse(open('./users.json')).users; 
 });
 
+// 2. KONFIGURASI SIMULASI MANUSIA ASLI (Sangat Santai & Natural)
 export const options = {
   scenarios: {
-    login_test: {
-      executor: 'ramping-arrival-rate',
-      startRate: 5,
-      timeUnit: '1s',
-      preAllocatedVUs: 10,
-      maxVUs: 50,
-      stages: [
-        { duration: '30s', target: 20 }, // Naik perlahan ke 20 request/detik
-        { duration: '1m', target: 20 },  // Stabil di 20 request/detik selama 1 menit
-        { duration: '10s', target: 0 },   // Menurunkan trafik kembali ke nol
-      ],
+    human_behavior_simulation: {
+      executor: 'constant-vus',
+      vus: 1,               // Cukup 1 sampai 2 Virtual User saja (seolah-olah Anda sendiri yang pakai)
+      duration: '2m',       // Jalankan simulasi selama 2 menit
     },
   },
 };
 
 export default function () {
-  // 3. MENGAMBIL AKUN SECARA ACAK DARI FILE JSON
-  const indeksAcak = Math.floor(Math.random() * dataAkun.length);
-  const userTerpilih = dataAkun[indeksAcak];
+  // Mengambil data akun
+  const userTerpilih = dataAkun[0]; 
 
   const url = 'https://modrinth.com'; 
 
-  // Memasukkan data asli hasil pembacaan JSON ke dalam payload
   const payload = JSON.stringify({
     username: userTerpilih.username,
     password: userTerpilih.password,
   });
 
+  // 3. MENYUSUN HEADER PERAMBAN YANG SEMPURNA
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      // Meniru browser Google Chrome versi terbaru di Windows 11
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-site',
     },
-    timeout: '10s',
+    timeout: '15s',
   };
 
   // Eksekusi request login
   const res = http.post(url, payload, params);
 
-  // Validasi hasil login
+  // Validasi hasil
   check(res, {
-    'Login Berhasil (200)': (r) => r.status === 200,
-    'Gagal Otentikasi (401)': (r) => r.status === 401,
-    'Terkena Pembatasan (429)': (r) => r.status === 429,
+    'Sukses Masuk (200)': (r) => r.status === 200,
+    'Diblokir Sistem (429)': (r) => r.status === 429,
   });
 
-  sleep(Math.random() * 2 + 1);
+  // 4. "THINK TIME" (JEDA ACAK MANUSIAWI)
+  // Manusia tidak mungkin login setiap 1 detik sekali. 
+  // Kita beri jeda acak yang panjang antara 8 sampai 15 detik sebelum mencoba lagi.
+  const waktuBerpikirManusia = Math.random() * 7 + 8; 
+  sleep(waktuBerpikirManusia);
 }
