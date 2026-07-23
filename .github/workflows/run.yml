@@ -1,17 +1,35 @@
-name: Eksekusi Bombardir Server Cloud
-on: [workflow_dispatch]
+name: High-Performance Security Scan
+
+# Skrip dapat dipicu secara manual dari tab "Actions" di browser HP Anda
+on:
+  workflow_dispatch:
 
 jobs:
-  k6_cloud_test:
+  nuclei_scan:
+    name: Execute Automated Security Scan
     runs-on: ubuntu-latest
+
     steps:
-      - name: Ambil Kode Skrip
+      # 1. Mengambil kode dari repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Jalankan Grafana k6 Secara Otomatis
-        uses: grafana/k6-action@v0.3.1
-        env:
-          # Menyuntikkan aturan bypass versi Node.js sesuai instruksi edaran GitHub 2026
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      # 2. Menjalankan Nuclei Engine Tingkat Tinggi
+      # Menggunakan Github Actions resmi dari ProjectDiscovery
+      - name: Run High-Performance Nuclei
+        uses: projectdiscovery/nuclei-action@main
         with:
-          filename: skrip_ekstrim.js
+          # MASUKKAN URL TARGET LINGKUNGAN INTERNAL/PRIBADI ANDA DI SINI
+          target: "https://maliska.sch.id"
+          
+          # KONFIGURASI TINGKAT TINGGI & AGRESIF
+          # --rate-limit 150: Mengirim hingga 150 request eksploitasi per detik
+          # --bulk-size 50: Memproses 50 target/template secara paralel
+          # --concurrency 50: Jumlah pengandalan thread simultan
+          flags: "-rate-limit 150 -bulk-size 50 -concurrency 50"
+
+      # 3. Mengunggah hasil pemindaian keamanan ke tab Security GitHub
+      - name: Upload Security Results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: nuclei.sarif
