@@ -1,0 +1,31 @@
+name: Automated Python Security Test
+
+# Pemicu manual dari browser HP di tab Actions
+on:
+  workflow_dispatch:
+
+jobs:
+  run_python_script:
+    name: Execute Python Fuzzing Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Mengambil kode dari repository Anda
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Menyiapkan lingkungan bahasa Python di server GitHub
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. Memasang pustaka requests yang dibutuhkan oleh skrip
+      - name: Install Dependencies
+        run: |
+          pip install requests
+
+      # 4. Mengeksekusi skrip Python
+      - name: Run Fuzzing Script
+        run: |
+          python fuzzing_test.py
